@@ -102,9 +102,3 @@ python -m http.server 8000             # open http://localhost:8000
 - **Least-privilege CI**: the workflow only has `contents: write`; actions are pinned.
 - `frame-ancestors` can't be set via a `<meta>` tag; GitHub Pages doesn't allow custom
   headers, so clickjacking protection there would need a proxy (Cloudflare) if required.
-
-## Verify on first real run
-Because I couldn't hit the network while building this, confirm these once:
-`^ndq` is the NASDAQ **Composite** on Stooq (not the 100), `xauusd` returns gold spot,
-`DEXCHUS` is CNY-per-USD, and `^tnx`-style yield scaling isn't an issue (FRED `DGS10` is
-already a clean percent). If a symbol is off, fix the one line in `scripts/sources.py`.
