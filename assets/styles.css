@@ -12,13 +12,16 @@
   --s4: #8E23C4;  /* Commodities     — purple  */
   --s5: #6A0DFF;  /* Crypto          — violet  */
 
-  /* Surfaces (light) */
-  --bg:      #FFFFFF;
-  --panel:   #FFFFFF;
-  --panel-2: #F5F5F8;
-  --hair:    rgba(17,17,26,.12);
-  --hair-2:  rgba(17,17,26,.07);
-  --shadow:  0 1px 2px rgba(17,17,26,.05), 0 10px 30px rgba(17,17,26,.05);
+  /* Surfaces (floral white theme) */
+  --bg:      #FFFAF0;   /* floral white — page background */
+  --panel:   #FFFFFF;   /* white cards lift off the cream */
+  --panel-2: #F6EFE1;   /* warm cream — table headers */
+  --hair:    rgba(74,48,10,.14);
+  --hair-2:  rgba(74,48,10,.08);
+  --shadow:  0 1px 2px rgba(74,48,10,.06), 0 10px 30px rgba(74,48,10,.06);
+
+  /* Title — single colour chosen to sit richly on floral white */
+  --title:   #8E23C4;
 
   /* Text */
   --text:    #17171F;
@@ -66,10 +69,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 8px 20px 48px; }
   margin: 0; font-weight: 800;
   font-size: clamp(24px, 4.4vw, 44px);
   letter-spacing: -.02em; line-height: 1.02;
-  /* Orange -> red -> magenta only (no purple/violet). */
-  background: linear-gradient(96deg, var(--s1) 0%, var(--s2) 48%, var(--s3) 100%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: transparent;
+  color: var(--title);
 }
 
 .clock { text-align: right; font-family: var(--font-mono); line-height: 1.25; }
@@ -135,6 +135,10 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 8px 20px 48px; }
 .name__label { font-weight: 600; font-size: 14px; }
 .name__meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); }
 .name__meta.is-stale { color: var(--s1); }
+
+.updated { color: var(--muted); }
+.updated.is-stale { color: var(--s1); }
+.updated__flag { font-size: 10.5px; letter-spacing: .04em; }
 
 .val { color: var(--text); }
 .val--prior, .val--twoday { color: var(--muted); }

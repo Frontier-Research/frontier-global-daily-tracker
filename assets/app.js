@@ -136,12 +136,19 @@
   function boardRow(row, index, reduceMotion) {
     const tick = el("span", { class: "name__tick", style: { "--tick": safeColor(row.color) } });
     const label = el("span", { class: "name__label", text: row.name });
-    const meta = el("span", { class: "name__meta", text: row.last_date || "—" });
-    if (row.note) { meta.classList.add("is-stale"); meta.title = row.note; meta.textContent = `${row.last_date || "—"} · stale`; }
-    const nameCell = el("td", { children: [el("div", { class: "name", children: [tick, el("span", { class: "name__text", children: [label, meta] })] })] });
+    const nameCell = el("td", { children: [el("div", { class: "name", children: [tick, el("span", { class: "name__text", children: [label] })] })] });
+
+    const updated = el("td", { class: "updated", children: [el("span", { text: row.last_date || "—" })] });
+    if (row.note) {
+      updated.classList.add("is-stale");
+      updated.title = row.note;
+      updated.appendChild(el("span", { class: "updated__flag", text: " · stale" }));
+    }
+
     const d = row.decimals;
     const tr = el("tr", { children: [
       nameCell,
+      updated,
       el("td", { class: "num val", text: fmt(row.today, d) }),
       el("td", { class: "num val val--prior", text: fmt(row.prior, d) }),
       el("td", { class: "num val val--twoday", text: fmt(row.twoday, d) }),
