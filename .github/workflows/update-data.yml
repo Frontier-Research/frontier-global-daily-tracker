@@ -1,12 +1,16 @@
 name: Update market data
 
 # Twice a day, tuned to Sri Lanka (UTC+5:30):
-#   02:00 UTC  ≈ 07:30 SLT  — after the US close + settle: captures equity/yield closes
-#   13:00 UTC  ≈ 18:30 SLT  — SL evening: captures overnight crypto/FX/commodity moves
+#   00:30 UTC  ≈ 06:00 SLT  — REPORT RUN. The US close (20:00-21:00 UTC) has settled
+#                             and overnight crypto/FX/commodities are captured, so the
+#                             board is ready ahead of a 07:00 SLT report.
+#   13:00 UTC  ≈ 18:30 SLT  — SL evening: captures the day's crypto/FX/commodity drift.
 # GitHub's scheduler can run a few minutes late; both slots have buffer to absorb it.
+# Note: FRED's DGS10 (10Y yield) can publish a day late regardless of run time — that's
+# a source lag, not a scheduling issue, and the board flags it as stale when it happens.
 on:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "30 0 * * *"
     - cron: "0 13 * * *"
   workflow_dispatch: {}   # allow a manual run from the Actions tab
 
