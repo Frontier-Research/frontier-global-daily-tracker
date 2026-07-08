@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!--
-    Content-Security-Policy: deny everything by default, then allow only same-origin
-    resources. No third-party hosts, no inline scripts, no inline styles, no eval.
-    Every dependency (ECharts, SheetJS) is vendored under assets/vendor and served
-    from this origin, so 'self' is all we need.
+    Content-Security-Policy: deny by default, allow only same-origin resources.
+    No third-party hosts, no inline scripts, no inline styles, no eval. Every
+    dependency (ECharts, SheetJS) is vendored under assets/vendor.
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
@@ -23,17 +22,17 @@
   " />
   <meta name="referrer" content="no-referrer" />
 
-  <title>Frontier Global Daily - Tracker</title>
+  <title>Frontier Global Daily Tracker</title>
 
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23FF6A00'/%3E%3Cstop offset='.5' stop-color='%23B23A85'/%3E%3Cstop offset='1' stop-color='%236A0DFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='3' fill='%230A0A0F'/%3E%3Crect x='3' y='3' width='10' height='10' rx='1.5' fill='url(%23g)'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23FF6A00'/%3E%3Cstop offset='.5' stop-color='%23DB4B45'/%3E%3Cstop offset='1' stop-color='%23B23A85'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='3' fill='%23ffffff'/%3E%3Crect x='3' y='3' width='10' height='10' rx='1.5' fill='url(%23g)'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
-  <a class="skip-link" href="#board">Skip to the board</a>
+  <a class="skip-link" href="#tabpanel-board">Skip to the board</a>
 
   <header class="masthead">
     <div class="masthead__row">
-      <h1 class="wordmark">Frontier Global Daily <span class="wordmark__dash">—</span> Tracker</h1>
+      <h1 class="wordmark">Frontier Global Daily Tracker</h1>
       <div class="clock" aria-live="polite">
         <span class="clock__date" id="sl-date">—</span>
         <span class="clock__zone">Sri Lanka</span>
@@ -43,10 +42,19 @@
     <p class="refreshed" id="refreshed">Loading latest data…</p>
   </header>
 
+  <nav class="tabs" aria-label="Views">
+    <div class="tabs__list" role="tablist">
+      <button class="tab is-active" role="tab" id="tab-board"      aria-selected="true"  aria-controls="tabpanel-board">Board</button>
+      <button class="tab"           role="tab" id="tab-historical" aria-selected="false" aria-controls="tabpanel-historical" tabindex="-1">Historical data</button>
+      <button class="tab"           role="tab" id="tab-charts"     aria-selected="false" aria-controls="tabpanel-charts" tabindex="-1">Charts</button>
+    </div>
+  </nav>
+
   <main>
-    <section id="board" class="board" aria-labelledby="board-heading">
+    <!-- ============================= BOARD ============================= -->
+    <section id="tabpanel-board" class="tabpanel" role="tabpanel" aria-labelledby="tab-board">
       <div class="section-head">
-        <h2 id="board-heading" class="eyebrow">The board</h2>
+        <h2 class="eyebrow">The board</h2>
         <p class="section-note">Latest close for each instrument, with one- and two-day change.</p>
       </div>
 
@@ -64,58 +72,120 @@
               <th scope="col" class="col-trend">Trend</th>
             </tr>
           </thead>
-          <tbody id="ledger-body">
-            <!-- rows built by app.js -->
-          </tbody>
+          <tbody id="ledger-body"></tbody>
         </table>
       </div>
     </section>
 
-    <section class="controls" aria-label="Chart controls">
-      <div class="range" role="group" aria-label="Chart date range">
-        <button type="button" class="range__btn" data-range="7">1W</button>
-        <button type="button" class="range__btn" data-range="30">1M</button>
-        <button type="button" class="range__btn" data-range="90">3M</button>
-        <button type="button" class="range__btn is-active" data-range="365">1Y</button>
-        <button type="button" class="range__btn" data-range="all">All</button>
+    <!-- ========================== HISTORICAL ========================== -->
+    <section id="tabpanel-historical" class="tabpanel" role="tabpanel" aria-labelledby="tab-historical" hidden>
+      <!-- Download segment -->
+      <div class="segment">
+        <div class="section-head">
+          <h2 class="eyebrow">Download snapshot</h2>
+          <p class="section-note">Export the board as it stood on any date, in the layout above.</p>
+        </div>
+        <div class="segment__controls">
+          <label class="field">
+            <span class="field__label">Snapshot date</span>
+            <input type="date" id="snap-date" class="input" />
+          </label>
+          <div class="segment__actions">
+            <button type="button" class="dl-btn" id="dl-csv">Download CSV</button>
+            <button type="button" class="dl-btn" id="dl-xlsx">Download Excel</button>
+          </div>
+        </div>
+        <p class="segment__hint" id="snap-hint"></p>
       </div>
-      <div class="downloads">
-        <button type="button" class="dl-btn" id="dl-csv">Download CSV</button>
-        <button type="button" class="dl-btn" id="dl-xlsx">Download Excel</button>
+
+      <!-- Browse segment -->
+      <div class="segment">
+        <div class="section-head">
+          <h2 class="eyebrow">Browse history</h2>
+          <p class="section-note">Daily closes for a single instrument over a date range.</p>
+        </div>
+        <div class="segment__controls">
+          <label class="field">
+            <span class="field__label">Instrument</span>
+            <select id="hist-instrument" class="input"></select>
+          </label>
+          <label class="field">
+            <span class="field__label">From</span>
+            <input type="date" id="hist-from" class="input" />
+          </label>
+          <label class="field">
+            <span class="field__label">To</span>
+            <input type="date" id="hist-to" class="input" />
+          </label>
+        </div>
+        <div class="table-wrap table-wrap--scroll" role="region" aria-label="Historical closes" tabindex="0">
+          <table class="ledger ledger--hist">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col" class="num">Close</th>
+                <th scope="col" class="num">Chg</th>
+                <th scope="col" class="num">Chg (%)</th>
+              </tr>
+            </thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <section class="grid" aria-label="Charts">
-      <article class="panel" data-group="Equities">
-        <header class="panel__head"><h3>Equities</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
-        <div class="chart" id="chart-equities" role="img" aria-label="Equity indices, rebased to 100"></div>
-      </article>
-
-      <article class="panel" data-group="Rates">
-        <header class="panel__head"><h3>Rates</h3><span class="panel__hint">US 10Y yield, percent</span></header>
-        <div class="chart" id="chart-rates" role="img" aria-label="US 10-year Treasury yield"></div>
-      </article>
-
-      <article class="panel" data-group="Emerging Markets">
-        <header class="panel__head"><h3>Emerging Markets</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
-        <div class="chart" id="chart-em" role="img" aria-label="Emerging market equity, currency and USD/CNY, rebased to 100"></div>
-      </article>
-
-      <article class="panel" data-group="Commodities">
-        <header class="panel__head"><h3>Commodities</h3><span class="panel__hint">Brent (left) · Gold (right)</span></header>
-        <div class="chart" id="chart-commodities" role="img" aria-label="Brent crude and spot gold"></div>
-      </article>
-
-      <article class="panel panel--wide" data-group="Crypto">
-        <header class="panel__head">
-          <h3>Crypto</h3>
-          <label class="toggle">
-            <input type="checkbox" id="btc-log" />
-            <span>Log scale</span>
+    <!-- ============================= CHARTS ============================ -->
+    <section id="tabpanel-charts" class="tabpanel" role="tabpanel" aria-labelledby="tab-charts" hidden>
+      <div class="chart-controls">
+        <div class="range" role="group" aria-label="Quick date range">
+          <button type="button" class="range__btn" data-range="7">1W</button>
+          <button type="button" class="range__btn" data-range="30">1M</button>
+          <button type="button" class="range__btn" data-range="90">3M</button>
+          <button type="button" class="range__btn is-active" data-range="365">1Y</button>
+          <button type="button" class="range__btn" data-range="all">All</button>
+        </div>
+        <div class="custom-range">
+          <label class="field field--inline">
+            <span class="field__label">From</span>
+            <input type="date" id="chart-from" class="input" />
           </label>
-        </header>
-        <div class="chart" id="chart-crypto" role="img" aria-label="Bitcoin in US dollars"></div>
-      </article>
+          <label class="field field--inline">
+            <span class="field__label">To</span>
+            <input type="date" id="chart-to" class="input" />
+          </label>
+          <button type="button" class="ghost-btn" id="chart-reset">Reset</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <article class="panel" data-group="Equities">
+          <header class="panel__head"><h3>Equities</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
+          <div class="chart" id="chart-equities" role="img" aria-label="Equity indices, rebased to 100"></div>
+        </article>
+
+        <article class="panel" data-group="Rates">
+          <header class="panel__head"><h3>Rates</h3><span class="panel__hint">US 10Y yield, percent</span></header>
+          <div class="chart" id="chart-rates" role="img" aria-label="US 10-year Treasury yield"></div>
+        </article>
+
+        <article class="panel" data-group="Emerging Markets">
+          <header class="panel__head"><h3>Emerging Markets</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
+          <div class="chart" id="chart-em" role="img" aria-label="Emerging market equity, currency and USD/CNY, rebased to 100"></div>
+        </article>
+
+        <article class="panel" data-group="Commodities">
+          <header class="panel__head"><h3>Commodities</h3><span class="panel__hint">Brent (left) · Gold (right)</span></header>
+          <div class="chart" id="chart-commodities" role="img" aria-label="Brent crude and spot gold"></div>
+        </article>
+
+        <article class="panel panel--wide" data-group="Crypto">
+          <header class="panel__head">
+            <h3>Crypto</h3>
+            <label class="toggle"><input type="checkbox" id="btc-log" /><span>Log scale</span></label>
+          </header>
+          <div class="chart" id="chart-crypto" role="img" aria-label="Bitcoin in US dollars"></div>
+        </article>
+      </div>
     </section>
   </main>
 
@@ -124,7 +194,6 @@
     <p class="footer__meta" id="footer-meta"></p>
   </footer>
 
-  <!-- Vendored, same-origin dependencies (see assets/vendor/README). -->
   <script src="assets/vendor/echarts.min.js" defer></script>
   <script src="assets/vendor/xlsx.full.min.js" defer></script>
   <script src="assets/app.js" defer></script>
