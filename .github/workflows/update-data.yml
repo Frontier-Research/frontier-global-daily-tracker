@@ -1,0 +1,67 @@
+name: Update market data
+
+# Twice a day, tuned to Sri Lanka (UTC+5:30):
+#   02:00 UTC  ≈ 07:30 SLT  — after the US close + settle: captures equity/yield closes
+#   13:00 UTC  ≈ 18:30 SLT  — SL evening: captures overnight crypto/FX/commodity moves
+# GitHub's scheduler can run a few minutes late; both slots have buffer to absorb it.
+on:
+  schedule:
+    - cron: "0 2 * * *"
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}   # allow a manual run from the Actions tab
+
+# Least privilege: the job only needs to push data commits.
+permissions:
+  contents: write
+
+# Never let two refreshes overlap and fight over the same files.
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      # Vendor the front-end libraries once, so the site is fully self-hosted and
+      # the Content-Security-Policy can stay 'self' only (no third-party script host).
+      - name: Vendor front-end libraries (if missing)
+        run: |
+          mkdir -p assets/vendor
+          if [ ! -f assets/vendor/echarts.min.js ]; then
+            curl -fsSL https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js \
+              -o assets/vendor/echarts.min.js
+          fi
+          if [ ! -f assets/vendor/xlsx.full.min.js ]; then
+            curl -fsSL https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js \
+              -o assets/vendor/xlsx.full.min.js
+          fi
+
+      - name: Fetch and update store
+        env:
+          # Optional: add a CoinGecko demo key as a repo secret to raise rate limits.
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: python scripts/fetch.py
+
+      - name: Commit changes
+        run: |
+          git config user.name  "frontier-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data assets/vendor
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "data: refresh $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
