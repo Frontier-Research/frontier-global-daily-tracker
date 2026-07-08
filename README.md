@@ -47,14 +47,22 @@ Everything is defined in one place — `scripts/sources.py`. The front end reads
 group, colour, unit and precision straight from the data, so adding or re-pointing an
 instrument is a one-line change there and nothing downstream needs editing.
 
+## The interface
+
+Three tabs: **Board** (the live snapshot), **Historical data** (download any past
+date's board as CSV/Excel, plus a per-instrument daily-history browser with a date
+range), and **Charts** (the five panels with quick ranges *and* a custom From/To range;
+the y-axis auto-calibrates to whatever window is shown). All of this runs off the same
+committed JSON — no extra pipeline output is needed.
+
 ## Refresh schedule (Sri Lanka time)
 
 Two runs a day, set in `.github/workflows/update-data.yml`:
 
 | Cron (UTC) | Sri Lanka | Purpose |
 |---|---|---|
-| `0 2 * * *` | ~07:30 SLT | After the US close (+ settle). Captures equity/yield closes; fresh for a Sri Lankan morning. |
-| `0 13 * * *` | ~18:30 SLT | Sri Lankan evening, before the next US open. Captures overnight crypto / FX / commodity moves. |
+| `30 0 * * *` | ~06:00 SLT | **Report run.** US close has settled + overnight crypto/FX/commodities captured, so the board is ready ahead of a 07:00 SLT report. |
+| `0 13 * * *` | ~18:30 SLT | Sri Lankan evening, before the next US open. Captures the day's crypto / FX / commodity drift. |
 
 For a **daily** series this is ample: each run pulls the full daily history and
 upserts by date, so history builds itself — one run after the US close would already
@@ -102,3 +110,9 @@ python -m http.server 8000             # open http://localhost:8000
 - **Least-privilege CI**: the workflow only has `contents: write`; actions are pinned.
 - `frame-ancestors` can't be set via a `<meta>` tag; GitHub Pages doesn't allow custom
   headers, so clickjacking protection there would need a proxy (Cloudflare) if required.
+
+## Verify on first real run
+Because I couldn't hit the network while building this, confirm these once:
+`^ndq` is the NASDAQ **Composite** on Stooq (not the 100), `xauusd` returns gold spot,
+`DEXCHUS` is CNY-per-USD, and `^tnx`-style yield scaling isn't an issue (FRED `DGS10` is
+already a clean percent). If a symbol is off, fix the one line in `scripts/sources.py`.
