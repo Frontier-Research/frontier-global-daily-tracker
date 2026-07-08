@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!--
+    Content-Security-Policy: deny everything by default, then allow only same-origin
+    resources. No third-party hosts, no inline scripts, no inline styles, no eval.
+    Every dependency (ECharts, SheetJS) is vendored under assets/vendor and served
+    from this origin, so 'self' is all we need.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    base-uri 'none';
+    form-action 'none';
+    img-src 'self' data:;
+    style-src 'self';
+    font-src 'self';
+    script-src 'self';
+    connect-src 'self';
+    manifest-src 'self';
+  " />
+  <meta name="referrer" content="no-referrer" />
+
+  <title>Frontier Global Daily - Tracker</title>
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23FF6A00'/%3E%3Cstop offset='.5' stop-color='%23B23A85'/%3E%3Cstop offset='1' stop-color='%236A0DFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='3' fill='%230A0A0F'/%3E%3Crect x='3' y='3' width='10' height='10' rx='1.5' fill='url(%23g)'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#board">Skip to the board</a>
+
+  <header class="masthead">
+    <div class="masthead__row">
+      <h1 class="wordmark">Frontier Global Daily <span class="wordmark__dash">—</span> Tracker</h1>
+      <div class="clock" aria-live="polite">
+        <span class="clock__date" id="sl-date">—</span>
+        <span class="clock__zone">Sri Lanka</span>
+      </div>
+    </div>
+    <div class="spectrum-rule" aria-hidden="true"></div>
+    <p class="refreshed" id="refreshed">Loading latest data…</p>
+  </header>
+
+  <main>
+    <section id="board" class="board" aria-labelledby="board-heading">
+      <div class="section-head">
+        <h2 id="board-heading" class="eyebrow">The board</h2>
+        <p class="section-note">Latest close for each instrument, with one- and two-day change.</p>
+      </div>
+
+      <div class="table-wrap" role="region" aria-label="Market board" tabindex="0">
+        <table class="ledger">
+          <thead>
+            <tr>
+              <th scope="col" class="col-name">Instrument</th>
+              <th scope="col" class="num">Today Close</th>
+              <th scope="col" class="num">Prior Close</th>
+              <th scope="col" class="num">2-Day Prior</th>
+              <th scope="col" class="num">Chg ($)</th>
+              <th scope="col" class="num">Chg (%)</th>
+              <th scope="col" class="num">2D Chg (%)</th>
+              <th scope="col" class="col-trend">Trend</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body">
+            <!-- rows built by app.js -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="Chart controls">
+      <div class="range" role="group" aria-label="Chart date range">
+        <button type="button" class="range__btn" data-range="7">1W</button>
+        <button type="button" class="range__btn" data-range="30">1M</button>
+        <button type="button" class="range__btn" data-range="90">3M</button>
+        <button type="button" class="range__btn is-active" data-range="365">1Y</button>
+        <button type="button" class="range__btn" data-range="all">All</button>
+      </div>
+      <div class="downloads">
+        <button type="button" class="dl-btn" id="dl-csv">Download CSV</button>
+        <button type="button" class="dl-btn" id="dl-xlsx">Download Excel</button>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="Charts">
+      <article class="panel" data-group="Equities">
+        <header class="panel__head"><h3>Equities</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
+        <div class="chart" id="chart-equities" role="img" aria-label="Equity indices, rebased to 100"></div>
+      </article>
+
+      <article class="panel" data-group="Rates">
+        <header class="panel__head"><h3>Rates</h3><span class="panel__hint">US 10Y yield, percent</span></header>
+        <div class="chart" id="chart-rates" role="img" aria-label="US 10-year Treasury yield"></div>
+      </article>
+
+      <article class="panel" data-group="Emerging Markets">
+        <header class="panel__head"><h3>Emerging Markets</h3><span class="panel__hint">Indexed to 100 at window start</span></header>
+        <div class="chart" id="chart-em" role="img" aria-label="Emerging market equity, currency and USD/CNY, rebased to 100"></div>
+      </article>
+
+      <article class="panel" data-group="Commodities">
+        <header class="panel__head"><h3>Commodities</h3><span class="panel__hint">Brent (left) · Gold (right)</span></header>
+        <div class="chart" id="chart-commodities" role="img" aria-label="Brent crude and spot gold"></div>
+      </article>
+
+      <article class="panel panel--wide" data-group="Crypto">
+        <header class="panel__head">
+          <h3>Crypto</h3>
+          <label class="toggle">
+            <input type="checkbox" id="btc-log" />
+            <span>Log scale</span>
+          </label>
+        </header>
+        <div class="chart" id="chart-crypto" role="img" aria-label="Bitcoin in US dollars"></div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Sources: FRED · Stooq · CoinGecko. Data is end-of-day and may lag on market holidays.</p>
+    <p class="footer__meta" id="footer-meta"></p>
+  </footer>
+
+  <!-- Vendored, same-origin dependencies (see assets/vendor/README). -->
+  <script src="assets/vendor/echarts.min.js" defer></script>
+  <script src="assets/vendor/xlsx.full.min.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</body>
+</html>
