@@ -3,9 +3,12 @@
 A static, GitHub Pages–hosted dashboard that tracks ten global instruments end-of-day,
 keeps a growing Excel history, and lets you download the latest board as CSV or Excel.
 
-Primary source is **Twelve Data** (free Basic plan). **Brent stays on FRED** because
-Twelve Data gates commodities behind its paid tier. Every Twelve-Data instrument also
-has a fallback source that fires only if the free tier is unavailable for that symbol.
+Each instrument tries an ordered **chain of sources** and takes whichever responds
+first. **Yahoo Finance** is the keyless primary for most instruments (it covers every
+asset class); **FRED** stays primary where it's proven reliable from GitHub Actions
+(10Y yield, USD/CNY, Brent). Stooq, CoinGecko, and Twelve Data sit later in the chain
+as fallbacks, so no single provider outage — or a cloud-IP block, or a missing key —
+can blank the board.
 
 ---
 
@@ -31,22 +34,21 @@ committed files. Same origin, so there is no CORS problem and no secret in the b
 
 ## The instruments
 
-| Instrument | Primary (Twelve Data) | Fallback |
-|---|---|---|
-| Dow Jones | `DJI` | Stooq `^dji` |
-| S&P 500 | `SPX` | Stooq `^spx` |
-| NASDAQ Composite | `IXIC` | Stooq `^ndq` |
-| US 10Y Treasury Yield | `US10Y` | FRED `DGS10` |
-| MSCI EM Index (EEM) | `EEM` | Stooq `eem.us` |
-| MSCI EM Ccy Idx (CEW) | `CEW` | Stooq `cew.us` |
-| USD/CNY | `USD/CNY` | FRED `DEXCHUS` |
-| Brent Crude Oil | FRED `DCOILBRENTEU` *(primary — not on TD free)* | — |
-| Spot Gold (XAU) | `XAU/USD` | Stooq `xauusd` |
-| Bitcoin (BTC/USD) | `BTC/USD` | CoinGecko `bitcoin` |
+| Instrument | Source chain (priority order) |
+|---|---|
+| Dow Jones | Yahoo `^DJI` → Stooq `^dji` → Twelve Data `DJI` |
+| S&P 500 | Yahoo `^GSPC` → Stooq `^spx` → Twelve Data `SPX` |
+| NASDAQ Composite | Yahoo `^IXIC` → Stooq `^ndq` → Twelve Data `IXIC` |
+| US 10Y Treasury Yield | FRED `DGS10` → Yahoo `^TNX` → Twelve Data `US10Y` |
+| MSCI EM Index (EEM) | Yahoo `EEM` → Stooq `eem.us` → Twelve Data `EEM` |
+| MSCI EM Ccy Idx (CEW) | Yahoo `CEW` → Stooq `cew.us` → Twelve Data `CEW` |
+| USD/CNY | FRED `DEXCHUS` → Yahoo `CNY=X` → Twelve Data `USD/CNY` |
+| Brent Crude Oil | FRED `DCOILBRENTEU` → Yahoo `BZ=F` |
+| Spot Gold (XAU) | Yahoo `GC=F` → Stooq `xauusd` → Twelve Data `XAU/USD` |
+| Bitcoin (BTC/USD) | Yahoo `BTC-USD` → CoinGecko `bitcoin` → Twelve Data `BTC/USD` |
 
-Twelve Data free tier: 8 API credits/min, 800/day. The pipeline throttles to ≤7/min,
-so a run takes ~1–2 minutes. The free tier is licensed for personal/non-commercial use —
-check this fits your use before relying on it for work reporting.
+Yahoo and FRED are keyless, so the pipeline works with **no API key at all**. The Twelve
+Data key (`TWELVE_DATA_API_KEY` secret) is optional — used only as a last-resort link.
 
 Everything is defined in one place — `scripts/sources.py`. The front end reads the
 group, colour, unit and precision straight from the data, so adding or re-pointing an
