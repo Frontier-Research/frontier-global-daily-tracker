@@ -54,7 +54,10 @@ jobs:
 
       - name: Fetch and update store
         env:
-          # Optional: add a CoinGecko demo key as a repo secret to raise rate limits.
+          # Primary source. Create a free Basic key at twelvedata.com and add it as
+          # a repo secret. Never printed or committed; redacted from all error logs.
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          # Optional: only used by fallback sources if Twelve Data is unavailable.
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: python scripts/fetch.py
 
