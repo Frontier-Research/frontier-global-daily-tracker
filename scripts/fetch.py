@@ -211,7 +211,7 @@ def main() -> None:
             points, used = inst.fetch()
             store[inst.id], _updated, merge_note = merge(store[inst.id], points)
             if used != inst.source:
-                note = f"Using {used} (Twelve Data unavailable)"
+                note = f"Using {used} ({inst.source} unavailable)"
                 if merge_note:
                     note += f" · {merge_note}"
                 print(f"[ok·fallback] {inst.id:<10} via {used}")

@@ -199,6 +199,52 @@ def fetch_coingecko(coin_id: str, days: int | None = None) -> List[Point]:
     return _dedupe_sorted(out)
 
 
+def fetch_yahoo(symbol: str) -> List[Point]:
+    """
+    Keyless daily history from Yahoo Finance's v8 chart endpoint. Covers every asset
+    class we need in one place: indices (^DJI ^GSPC ^IXIC), the 10Y yield (^TNX),
+    ETFs (EEM CEW), FX (CNY=X), commodities (BZ=F Brent, GC=F gold) and crypto (BTC-USD).
+    Needs a browser-like User-Agent; the chart endpoint requires no auth crumb.
+    """
+    headers = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")}
+    params = {"range": "10y", "interval": "1d"}
+    last_exc = None
+    for host in ("query1.finance.yahoo.com", "query2.finance.yahoo.com"):
+        try:
+            data = _get(f"https://{host}/v8/finance/chart/{symbol}",
+                        params=params, headers=headers).json()
+            chart = data.get("chart") or {}
+            if chart.get("error"):
+                err = chart["error"]
+                desc = err.get("description") if isinstance(err, dict) else err
+                raise RuntimeError(f"yahoo: {desc}")
+            result = chart.get("result")
+            if not result:
+                raise RuntimeError("yahoo: empty result")
+            r0 = result[0]
+            stamps = r0.get("timestamp") or []
+            quote = ((r0.get("indicators") or {}).get("quote") or [{}])[0]
+            closes = quote.get("close") or []
+            out: List[Point] = []
+            for ts, close in zip(stamps, closes):
+                if close is None:
+                    continue
+                date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+                value = _safe_float(str(close))
+                if value is not None:
+                    out.append((date, value))
+            # ^TNX is the 10Y yield; Yahoo has historically quoted it x10 — normalise.
+            if symbol.upper() == "^TNX":
+                out = [(d, v / 10 if v > 20 else v) for d, v in out]
+            if not out:
+                raise RuntimeError(f"yahoo: no usable rows for '{symbol}'")
+            return _dedupe_sorted(out)
+        except Exception as exc:  # noqa: BLE001 - try the alternate host before giving up
+            last_exc = exc
+    raise RuntimeError(f"yahoo: {last_exc}")
+
+
 # --------------------------------------------------------------------------- #
 # Registry                                                                     #
 # --------------------------------------------------------------------------- #
@@ -208,6 +254,7 @@ GROUP_COLORS = {
 }
 
 _ADAPTERS = {
+    "yahoo": fetch_yahoo,
     "twelvedata": fetch_twelvedata,
     "stooq": fetch_stooq,
     "fred": fetch_fred,
@@ -232,43 +279,41 @@ class Instrument:
         return GROUP_COLORS[self.group]
 
 
-def _make(*, id, name, group, unit, source, symbol, decimals, order, fallback=None) -> Instrument:
-    primary = lambda: _ADAPTERS[source](symbol)  # noqa: E731
-    fb_source, fb_symbol = fallback if fallback else (None, None)
-    fb = (lambda: _ADAPTERS[fb_source](fb_symbol)) if fallback else None
+def _make(*, id, name, group, unit, sources, decimals, order) -> Instrument:
+    """`sources` is an ordered list of (source_name, symbol). fetch() tries each in
+    turn and returns the first that responds, so no single provider outage — or a
+    cloud-IP block, or a missing key — can blank the board on its own."""
+    chain = list(sources)
+    primary_source, primary_symbol = chain[0]
 
     def fetch() -> Tuple[List[Point], str]:
-        """Return (points, source_used). Falls back only if the primary fails.
-        If both fail, raise a combined (already-redacted) error naming each cause,
-        so the log/board shows *why* instead of a bare 'RuntimeError'."""
-        try:
-            return primary(), source
-        except Exception as e_primary:
-            if fb is None:
-                raise
+        errors = []
+        for src, sym in chain:
             try:
-                return fb(), fb_source
-            except Exception as e_fb:
-                raise RuntimeError(f"{source} → {e_primary}  ||  {fb_source} → {e_fb}")
+                return _ADAPTERS[src](sym), src
+            except Exception as exc:  # noqa: BLE001 - record and try the next link
+                errors.append(f"{src} → {exc}")
+        raise RuntimeError("  ||  ".join(errors))
 
-    return Instrument(id=id, name=name, group=group, unit=unit, source=source,
-                      symbol=symbol, decimals=decimals, order=order, fetch=fetch)
+    return Instrument(id=id, name=name, group=group, unit=unit, source=primary_source,
+                      symbol=primary_symbol, decimals=decimals, order=order, fetch=fetch)
 
 
-# Order mirrors the reference screenshot.
-# VERIFY on first run with your key: Twelve Data index symbols DJI / SPX / IXIC and
-# ETF symbols EEM / CEW. Any the free tier rejects will auto-fall back to Stooq.
+# Order mirrors the reference screenshot. Each instrument lists its source chain in
+# priority order. Yahoo is keyless and covers every asset class; FRED stays first where
+# it is proven reliable from GitHub Actions (yield, USD/CNY, Brent). Stooq / CoinGecko /
+# Twelve Data are later links used only if the earlier ones are unavailable.
 INSTRUMENTS: List[Instrument] = [
-    _make(id="dow_jones", name="Dow Jones",             group="Equities",         unit="index",       source="twelvedata", symbol="DJI",     decimals=2, order=1,  fallback=("stooq", "^dji")),
-    _make(id="sp500",     name="S&P 500",               group="Equities",         unit="index",       source="twelvedata", symbol="SPX",     decimals=2, order=2,  fallback=("stooq", "^spx")),
-    _make(id="nasdaq",    name="NASDAQ Composite",      group="Equities",         unit="index",       source="twelvedata", symbol="IXIC",    decimals=2, order=3,  fallback=("stooq", "^ndq")),
-    _make(id="us10y",     name="US 10Y Treasury Yield", group="Rates",            unit="percent",     source="twelvedata", symbol="US10Y",   decimals=3, order=4,  fallback=("fred", "DGS10")),
-    _make(id="eem",       name="MSCI EM Index (EEM)",   group="Emerging Markets", unit="usd",         source="twelvedata", symbol="EEM",     decimals=2, order=5,  fallback=("stooq", "eem.us")),
-    _make(id="cew",       name="MSCI EM Ccy Idx (CEW)", group="Emerging Markets", unit="usd",         source="twelvedata", symbol="CEW",     decimals=2, order=6,  fallback=("stooq", "cew.us")),
-    _make(id="usdcny",    name="USD/CNY",               group="Emerging Markets", unit="fx",          source="twelvedata", symbol="USD/CNY", decimals=4, order=7,  fallback=("fred", "DEXCHUS")),
-    _make(id="brent",     name="Brent Crude Oil",       group="Commodities",      unit="usd_per_bbl", source="fred",       symbol="DCOILBRENTEU", decimals=2, order=8),  # TD commodities are paid; FRED is keyless
-    _make(id="gold",      name="Spot Gold (XAU)",       group="Commodities",      unit="usd",         source="twelvedata", symbol="XAU/USD", decimals=2, order=9,  fallback=("stooq", "xauusd")),
-    _make(id="btc",       name="Bitcoin (BTC/USD)",     group="Crypto",           unit="usd",         source="twelvedata", symbol="BTC/USD", decimals=2, order=10, fallback=("coingecko", "bitcoin")),
+    _make(id="dow_jones", name="Dow Jones",             group="Equities",         unit="index",       decimals=2, order=1,  sources=[("yahoo", "^DJI"),  ("stooq", "^dji"),   ("twelvedata", "DJI")]),
+    _make(id="sp500",     name="S&P 500",               group="Equities",         unit="index",       decimals=2, order=2,  sources=[("yahoo", "^GSPC"), ("stooq", "^spx"),   ("twelvedata", "SPX")]),
+    _make(id="nasdaq",    name="NASDAQ Composite",      group="Equities",         unit="index",       decimals=2, order=3,  sources=[("yahoo", "^IXIC"), ("stooq", "^ndq"),   ("twelvedata", "IXIC")]),
+    _make(id="us10y",     name="US 10Y Treasury Yield", group="Rates",            unit="percent",     decimals=3, order=4,  sources=[("fred", "DGS10"),  ("yahoo", "^TNX"),   ("twelvedata", "US10Y")]),
+    _make(id="eem",       name="MSCI EM Index (EEM)",   group="Emerging Markets", unit="usd",         decimals=2, order=5,  sources=[("yahoo", "EEM"),   ("stooq", "eem.us"), ("twelvedata", "EEM")]),
+    _make(id="cew",       name="MSCI EM Ccy Idx (CEW)", group="Emerging Markets", unit="usd",         decimals=2, order=6,  sources=[("yahoo", "CEW"),   ("stooq", "cew.us"), ("twelvedata", "CEW")]),
+    _make(id="usdcny",    name="USD/CNY",               group="Emerging Markets", unit="fx",          decimals=4, order=7,  sources=[("fred", "DEXCHUS"),("yahoo", "CNY=X"),  ("twelvedata", "USD/CNY")]),
+    _make(id="brent",     name="Brent Crude Oil",       group="Commodities",      unit="usd_per_bbl", decimals=2, order=8,  sources=[("fred", "DCOILBRENTEU"), ("yahoo", "BZ=F")]),
+    _make(id="gold",      name="Spot Gold (XAU)",       group="Commodities",      unit="usd",         decimals=2, order=9,  sources=[("yahoo", "GC=F"),  ("stooq", "xauusd"), ("twelvedata", "XAU/USD")]),
+    _make(id="btc",       name="Bitcoin (BTC/USD)",     group="Crypto",           unit="usd",         decimals=2, order=10, sources=[("yahoo", "BTC-USD"), ("coingecko", "bitcoin"), ("twelvedata", "BTC/USD")]),
 ]
 
 INSTRUMENTS.sort(key=lambda x: x.order)
