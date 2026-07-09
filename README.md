@@ -3,8 +3,9 @@
 A static, GitHub Pages–hosted dashboard that tracks ten global instruments end-of-day,
 keeps a growing Excel history, and lets you download the latest board as CSV or Excel.
 
-Sources are all free: **FRED** (rates, USD/CNY, Brent), **Stooq** (equity indices,
-EEM, CEW, gold), **CoinGecko** (Bitcoin).
+Primary source is **Twelve Data** (free Basic plan). **Brent stays on FRED** because
+Twelve Data gates commodities behind its paid tier. Every Twelve-Data instrument also
+has a fallback source that fires only if the free tier is unavailable for that symbol.
 
 ---
 
@@ -30,18 +31,22 @@ committed files. Same origin, so there is no CORS problem and no secret in the b
 
 ## The instruments
 
-| Instrument | Source | Symbol |
+| Instrument | Primary (Twelve Data) | Fallback |
 |---|---|---|
-| Dow Jones | Stooq | `^dji` |
-| S&P 500 | Stooq | `^spx` |
-| NASDAQ Composite | Stooq | `^ndq` |
-| US 10Y Treasury Yield | FRED | `DGS10` |
-| MSCI EM Index (EEM) | Stooq | `eem.us` |
-| MSCI EM Ccy Idx (CEW) | Stooq | `cew.us` |
-| USD/CNY | FRED | `DEXCHUS` |
-| Brent Crude Oil | FRED | `DCOILBRENTEU` |
-| Spot Gold (XAU) | Stooq | `xauusd` |
-| Bitcoin (BTC/USD) | CoinGecko | `bitcoin` |
+| Dow Jones | `DJI` | Stooq `^dji` |
+| S&P 500 | `SPX` | Stooq `^spx` |
+| NASDAQ Composite | `IXIC` | Stooq `^ndq` |
+| US 10Y Treasury Yield | `US10Y` | FRED `DGS10` |
+| MSCI EM Index (EEM) | `EEM` | Stooq `eem.us` |
+| MSCI EM Ccy Idx (CEW) | `CEW` | Stooq `cew.us` |
+| USD/CNY | `USD/CNY` | FRED `DEXCHUS` |
+| Brent Crude Oil | FRED `DCOILBRENTEU` *(primary — not on TD free)* | — |
+| Spot Gold (XAU) | `XAU/USD` | Stooq `xauusd` |
+| Bitcoin (BTC/USD) | `BTC/USD` | CoinGecko `bitcoin` |
+
+Twelve Data free tier: 8 API credits/min, 800/day. The pipeline throttles to ≤7/min,
+so a run takes ~1–2 minutes. The free tier is licensed for personal/non-commercial use —
+check this fits your use before relying on it for work reporting.
 
 Everything is defined in one place — `scripts/sources.py`. The front end reads the
 group, colour, unit and precision straight from the data, so adding or re-pointing an
@@ -85,8 +90,11 @@ returns no new date. A failed fetch keeps the stored history untouched.
 3. **Settings → Actions → General** → allow workflows to write (Read and write permissions).
 4. **Actions** tab → run *Update market data* once via *Run workflow* to replace the
    bundled sample data with real data and vendor the chart libraries.
-5. (Optional) Add a `COINGECKO_API_KEY` repo secret to raise CoinGecko's rate limit — not
-   required for twice-a-day polling.
+5. **Add your Twelve Data key** as a repo secret named `TWELVE_DATA_API_KEY`
+   (Settings → Secrets and variables → Actions). Create a free Basic key at
+   twelvedata.com. Without it, every instrument falls back to its secondary source.
+6. (Optional) Add a `COINGECKO_API_KEY` secret — only used if Bitcoin falls back to
+   CoinGecko. Not required for normal operation.
 
 ### Preview locally
 ```bash
@@ -103,15 +111,17 @@ python -m http.server 8000             # open http://localhost:8000
   vendored locally so `script-src 'self'` holds.
 - **No injection surface**: every value that reaches the DOM goes through `textContent`
   or a validated attribute (colours are regex-checked hex) — never `innerHTML`.
-- **No secrets in the browser**: FRED uses the keyless CSV export; the only optional
-  secret (CoinGecko key) lives in Actions, never in the page.
+- **No secrets in the browser**: the Twelve Data key lives only in an Actions secret,
+  never in code, committed files, or the page. Twelve Data accepts the key only as a URL
+  parameter, so it is redacted from every error/log string (on top of Actions' own secret
+  masking). FRED (Brent) is keyless.
 - **Resilient fetching**: HTTPS with cert verification on, bounded timeouts, retry with
   backoff, value sanity-checks, and atomic writes so a bad run can't corrupt the store.
 - **Least-privilege CI**: the workflow only has `contents: write`; actions are pinned.
 - `frame-ancestors` can't be set via a `<meta>` tag; GitHub Pages doesn't allow custom
   headers, so clickjacking protection there would need a proxy (Cloudflare) if required.
 
-## To Note for me - Verify on first real run
+## Verify on first real run
 Because I couldn't hit the network while building this, confirm these once:
 `^ndq` is the NASDAQ **Composite** on Stooq (not the 100), `xauusd` returns gold spot,
 `DEXCHUS` is CNY-per-USD, and `^tnx`-style yield scaling isn't an issue (FRED `DGS10` is
