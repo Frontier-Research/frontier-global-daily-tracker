@@ -206,9 +206,16 @@ def main() -> None:
 
     for inst in INSTRUMENTS:
         note = ""
+        used = inst.source
         try:
-            points = inst.fetch()
-            store[inst.id], _updated, note = merge(store[inst.id], points)
+            points, used = inst.fetch()
+            store[inst.id], _updated, merge_note = merge(store[inst.id], points)
+            if used != inst.source:
+                note = f"Using {used} (Twelve Data unavailable)"
+                if merge_note:
+                    note += f" · {merge_note}"
+            else:
+                note = merge_note
         except Exception as exc:  # noqa: BLE001 - keep other instruments running
             note = f"Source unavailable this run ({type(exc).__name__})"
             notes.append(f"{inst.name}: {note}")
@@ -219,13 +226,13 @@ def main() -> None:
         series_sorted = sorted(store[inst.id].items())[-SERIES_CAP:]
         _atomic_write_json(os.path.join(SERIES, f"{inst.id}.json"), {
             "id": inst.id, "name": inst.name, "group": inst.group, "color": inst.color,
-            "unit": inst.unit, "decimals": inst.decimals, "source": inst.source,
+            "unit": inst.unit, "decimals": inst.decimals, "source": used,
             "points": [[d, round(v, 6)] for d, v in series_sorted],
         })
 
         rows.append({
             "id": inst.id, "name": inst.name, "group": inst.group, "color": inst.color,
-            "unit": inst.unit, "decimals": inst.decimals, "source": inst.source,
+            "unit": inst.unit, "decimals": inst.decimals, "source": used,
             "order": inst.order,
             **metrics,
             "note": note,
