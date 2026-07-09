@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so a pull --rebase before pushing is clean
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -68,7 +70,21 @@ jobs:
           git add data assets/vendor
           if git diff --cached --quiet; then
             echo "No changes to commit."
-          else
-            git commit -m "data: refresh $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git push
+            exit 0
           fi
+          git commit -m "data: refresh $(date -u '+%Y-%m-%d %H:%M UTC')"
+          # The remote may have moved ahead (manual commits or a prior run). Rebase our
+          # data commit onto the latest branch and retry the push a few times so a race
+          # never fails the run. The bot owns data/, so its regenerated files are authoritative.
+          branch="${GITHUB_REF_NAME:-main}"
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "$branch" || { echo "rebase failed"; exit 1; }
+            if git push origin "HEAD:$branch"; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt); syncing and retrying…"
+            sleep 3
+          done
+          echo "Failed to push after retries." >&2
+          exit 1
