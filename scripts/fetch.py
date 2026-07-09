@@ -214,11 +214,14 @@ def main() -> None:
                 note = f"Using {used} (Twelve Data unavailable)"
                 if merge_note:
                     note += f" · {merge_note}"
+                print(f"[ok·fallback] {inst.id:<10} via {used}")
             else:
                 note = merge_note
+                print(f"[ok]          {inst.id:<10} via {used}")
         except Exception as exc:  # noqa: BLE001 - keep other instruments running
-            note = f"Source unavailable this run ({type(exc).__name__})"
-            notes.append(f"{inst.name}: {note}")
+            note = f"Unavailable — {exc}"
+            notes.append(f"{inst.name}: {exc}")
+            print(f"[FAIL]        {inst.id:<10} {exc}")
 
         metrics = derive(store[inst.id])
 

@@ -238,13 +238,18 @@ def _make(*, id, name, group, unit, source, symbol, decimals, order, fallback=No
     fb = (lambda: _ADAPTERS[fb_source](fb_symbol)) if fallback else None
 
     def fetch() -> Tuple[List[Point], str]:
-        """Return (points, source_used). Falls back only if the primary fails."""
+        """Return (points, source_used). Falls back only if the primary fails.
+        If both fail, raise a combined (already-redacted) error naming each cause,
+        so the log/board shows *why* instead of a bare 'RuntimeError'."""
         try:
             return primary(), source
-        except Exception:
-            if fb is not None:
-                return fb(), fb_source     # if the fallback also fails, it propagates
-            raise
+        except Exception as e_primary:
+            if fb is None:
+                raise
+            try:
+                return fb(), fb_source
+            except Exception as e_fb:
+                raise RuntimeError(f"{source} → {e_primary}  ||  {fb_source} → {e_fb}")
 
     return Instrument(id=id, name=name, group=group, unit=unit, source=source,
                       symbol=symbol, decimals=decimals, order=order, fetch=fetch)
